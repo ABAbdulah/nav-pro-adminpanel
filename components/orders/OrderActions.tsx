@@ -67,13 +67,15 @@ function EndOrder({ status, provider, action, state }: {
   )
 }
 
-export function OrderActions({ order, carriers }: { order: OrderDetail; carriers: string[] }) {
+export function OrderActions({ order, carriers, owner }: { order: OrderDetail; carriers: string[]; owner: boolean }) {
   const bound = updateOrder.bind(null, order.orderNo)
   // One result for every status change: the form that made it usually
   // disappears once the order moves on, so its message is shown up here.
   const [statusState, statusAction] = useActionState<ActionState, FormData>(bound, {})
   const [trackState, trackAction] = useActionState<ActionState, FormData>(bound, {})
   const [noteState, noteAction] = useActionState<ActionState, FormData>(bound, {})
+  const [costState, costAction] = useActionState<ActionState, FormData>(bound, {})
+  const held = order.items.filter((i) => i.ownStock && i.ownStock.qty > 0)
   const next = order.nextStatuses
   const provider = order.payments.find((p) => p.status === 'succeeded')?.provider ?? order.payments.at(-1)?.provider ?? null
 
@@ -100,6 +102,15 @@ export function OrderActions({ order, carriers }: { order: OrderDetail; carriers
               <input type="checkbox" name="notifyCustomer" defaultChecked className="mt-1 size-4" />
               Email {order.email} the tracking details
             </label>
+            {held.length > 0 && (
+              <>
+                <input type="hidden" name="stockOffered" value="1" />
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="takeFromStock" defaultChecked className="mt-1 size-4" />
+                  <span>Take {held.map((i) => `${i.qty} × ${i.partNo}`).join(', ')} off our own stock</span>
+                </label>
+              </>
+            )}
             <SubmitButton size="lg" pendingLabel="Saving…"><Send aria-hidden="true" /> Mark shipped</SubmitButton>
           </form>
         )}
@@ -119,6 +130,20 @@ export function OrderActions({ order, carriers }: { order: OrderDetail; carriers
         )}
         {(order.status === 'cancelled' || order.status === 'refunded') && (
           <p className="text-sm text-muted-foreground">This order is closed. Nothing more to do.</p>
+        )}
+
+        {owner && order.status !== 'pending' && (
+          <form action={costAction} className="grid gap-2 border-t pt-4">
+            <input type="hidden" name="intent" value="deliveryCost" />
+            <label htmlFor="shipping-cost" className="field-label">What delivery cost us, ex GST</label>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true">$</span>
+              <Input id="shipping-cost" name="shippingCost" inputMode="decimal" defaultValue={order.shippingCostExGst?.toFixed(2) ?? ''} placeholder="From the carrier’s invoice" className="max-w-44" />
+              <SubmitButton variant="outline" pendingLabel="Saving…">Save</SubmitButton>
+            </div>
+            <p className="field-help">Used for net profit on the dashboard. Leave empty if you don’t know it yet.</p>
+            <FormMessage state={costState} />
+          </form>
         )}
 
         <form action={noteAction} className="grid gap-2 border-t pt-4">

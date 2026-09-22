@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Check, ExternalLink } from 'lucide-react'
 import { ApiError, adminApi } from '@/lib/api'
+import { requireOperator } from '@/lib/session'
 import type { OrderDetail } from '@/lib/types'
 import { dateTime, money, percent } from '@/lib/format'
 import { Card, PageHeader, Pill, StatusBadge } from '@/components/page'
@@ -59,6 +60,8 @@ function Timeline({ order }: { order: OrderDetail }) {
 
 export default async function OrderPage({ params }: Props) {
   const { orderNo } = await params
+  const operator = await requireOperator()
+  const owner = operator.role === 'owner'
   let order: OrderDetail
   let carriers: string[]
   try {
@@ -87,11 +90,14 @@ export default async function OrderPage({ params }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div className="grid min-w-0 content-start gap-6">
-          <Card title="What to send" description="Order each line from the supplier using its SKU. The customer saw the store’s title, not the supplier’s." bodyClassName="p-0">
+          <Card title="What to send" description="Order each line from the supplier using its SKU, or take it from your own stock. The customer saw the store’s title, not the supplier’s." bodyClassName="p-0">
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
-                  <tr><th>Part, and where to order it</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Cost ex GST</th><th className="num">Profit ex GST</th></tr>
+                  <tr>
+                    <th>Part, and where to order it</th><th className="num">Qty</th><th className="num">Price</th>
+                    {owner && <><th className="num">Cost ex GST</th><th className="num">Profit ex GST</th></>}
+                  </tr>
                 </thead>
                 <tbody>
                   {order.items.map((i, n) => (
@@ -100,19 +106,23 @@ export default async function OrderPage({ params }: Props) {
                         <div className="flex items-start gap-3">
                           {i.image ? <img src={i.image} alt="" width={44} height={44} className="size-11 shrink-0 rounded-md border object-contain bg-white" /> : <span className="size-11 shrink-0 rounded-md border bg-muted" aria-hidden="true" />}
                           <div className="min-w-0">
-                            {i.partId ? <Link href={`/products/${i.partId}`} className="font-medium hover:underline">{i.title}</Link> : <span className="font-medium">{i.title}</span>}
+                            {i.partId && owner ? <Link href={`/products/${i.partId}`} className="font-medium hover:underline">{i.title}</Link> : <span className="font-medium">{i.title}</span>}
                             <span className="block text-xs text-muted-foreground">{i.brand ? `${i.brand} · ` : ''}{i.partNo}</span>
                             <span className="mt-1 block text-[13px]">
                               Order from <span className="font-semibold">{i.supplier ?? '—'}</span>{i.supplierSku && <> · SKU <span className="font-semibold">{i.supplierSku}</span></>}
                             </span>
                             {i.supplierTitle && <span className="block text-xs text-muted-foreground">{i.supplierTitle}</span>}
+                            {i.ownStock && i.ownStock.qty > 0 && (
+                              <span className="mt-1 inline-flex rounded-full bg-[#e3f4ec] px-2 py-0.5 text-xs font-semibold text-[#0f6a41]">
+                                We hold {i.ownStock.qty}{i.ownStock.location ? ` · ${i.ownStock.location}` : ''}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
                       <td className="num font-semibold">{i.qty}</td>
                       <td className="num">{money(i.lineIncGst)}<span className="block text-xs text-muted-foreground">{money(i.unitIncGst)} each</span></td>
-                      <td className="num">{money(i.lineCostExGst)}</td>
-                      <td className="num">{money(i.lineProfitExGst)}</td>
+                      {owner && <><td className="num">{money(i.lineCostExGst)}</td><td className="num">{money(i.lineProfitExGst)}</td></>}
                     </tr>
                   ))}
                 </tbody>
@@ -123,9 +133,14 @@ export default async function OrderPage({ params }: Props) {
               <div className="flex justify-between"><dt className="text-muted-foreground">Delivery · {order.shippingLabel}</dt><dd>{money(order.shippingIncGst)}</dd></div>
               <div className="flex justify-between text-base font-bold"><dt>Total paid</dt><dd>{money(order.totalIncGst)}</dd></div>
               <div className="flex justify-between text-xs text-muted-foreground"><dt>Includes GST</dt><dd>{money(order.gstAmount)}</dd></div>
-              <div className="mt-2 flex justify-between border-t pt-2"><dt className="text-muted-foreground">Sales ex GST</dt><dd>{money(order.profit.revenueExGst)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Cost of parts</dt><dd>{money(order.profit.costOfGoodsExGst)}</dd></div>
-              <div className="flex justify-between font-semibold"><dt>Gross profit</dt><dd>{money(order.profit.grossProfitExGst)} <span className="font-normal text-muted-foreground">({percent(order.profit.grossMarginPct)})</span></dd></div>
+              {order.profit && (
+                <>
+                  <div className="mt-2 flex justify-between border-t pt-2"><dt className="text-muted-foreground">Sales ex GST</dt><dd>{money(order.profit.revenueExGst)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-muted-foreground">Cost of parts</dt><dd>{money(order.profit.costOfGoodsExGst)}</dd></div>
+                  <div className="flex justify-between font-semibold"><dt>Gross profit</dt><dd>{money(order.profit.grossProfitExGst)} <span className="font-normal text-muted-foreground">({percent(order.profit.grossMarginPct)})</span></dd></div>
+                  <div className="flex justify-between"><dt className="text-muted-foreground">What delivery cost us</dt><dd>{order.shippingCostExGst === null || order.shippingCostExGst === undefined ? 'not entered' : money(order.shippingCostExGst)}</dd></div>
+                </>
+              )}
             </dl>
           </Card>
 
@@ -154,18 +169,26 @@ export default async function OrderPage({ params }: Props) {
           </Card>
 
           <Card title="History" description="Every change made in the admin panel, newest first.">
-            <History entries={order.history} labels={{ status: 'Status', carrier: 'Carrier', tracking_number: 'Tracking number', admin_notes: 'Internal notes' }} />
+            <History
+              entries={order.history}
+              labels={{ status: 'Status', carrier: 'Carrier', tracking_number: 'Tracking number', admin_notes: 'Internal notes', shipping_cost_ex_gst: 'Delivery cost' }}
+            />
           </Card>
         </div>
 
         <div className="grid content-start gap-6">
-          <OrderActions order={order} carriers={carriers} />
+          <OrderActions order={order} carriers={carriers} owner={owner} />
 
           <Card title="Customer">
             <p className="font-semibold">{order.customerName}</p>
             <p className="text-sm"><a className="text-action-text underline" href={`mailto:${order.email}`}>{order.email}</a></p>
             <p className="text-sm"><a className="text-action-text underline" href={`tel:${order.phone.replace(/\s/g, '')}`}>{order.phone}</a></p>
             <p className="mt-1 text-xs text-muted-foreground">{order.userId ? 'Has a store account' : 'Checked out as a guest'}{order.abn ? ` · ABN ${order.abn}` : ''}</p>
+            {owner && (
+              <Link href={`/customers/${encodeURIComponent(order.email)}`} className="mt-1 inline-flex min-h-9 items-center text-sm font-medium text-action-text underline">
+                All orders from this customer
+              </Link>
+            )}
             <h3 className="mt-4 text-sm font-semibold">Deliver to</h3>
             <address className="text-sm not-italic leading-relaxed">
               {[a.fullName, a.company, a.street1, a.street2, `${a.suburb} ${a.state} ${a.postcode}`].filter(Boolean).map((line) => <span key={line} className="block">{line}</span>)}

@@ -2,45 +2,18 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AlertTriangle, Info } from 'lucide-react'
 import { adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { Overview, SalesReport } from '@/lib/types'
-import { money, moneyShort, percent, shiftDays, today } from '@/lib/format'
+import { money, moneyShort, percent } from '@/lib/format'
+import { resolveRange, type RangeSearch } from '@/lib/range'
 import { Card, PageHeader } from '@/components/page'
 import { ErrorPanel } from '@/components/ErrorPanel'
-import { RangeControls, type RangeKey } from '@/components/dashboard/RangeControls'
+import { RangeControls } from '@/components/dashboard/RangeControls'
 import { SalesChart } from '@/components/dashboard/SalesChart'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
-type Search = { range?: string; from?: string; to?: string; interval?: string }
-const DATE = /^\d{4}-\d{2}-\d{2}$/
-const RANGES: RangeKey[] = ['7d', '30d', '90d', '12m', 'all', 'custom']
-
-function monthsBack(ymd: string, months: number): string {
-  const d = new Date(`${ymd.slice(0, 7)}-01T00:00:00Z`)
-  d.setUTCMonth(d.getUTCMonth() - months)
-  return d.toISOString().slice(0, 10)
-}
-
-/** The dates the report covers, from the URL. Defaults to the last 30 days. */
-function resolveRange(search: Search, firstSale: string | null) {
-  const end = today()
-  const range: RangeKey = RANGES.includes(search.range as RangeKey) ? (search.range as RangeKey) : search.from ? 'custom' : '30d'
-  let from: string
-  let to = end
-  if (range === '7d') from = shiftDays(end, -6)
-  else if (range === '90d') from = shiftDays(end, -89)
-  else if (range === '12m') from = monthsBack(end, 11)
-  else if (range === 'all') from = firstSale ?? shiftDays(end, -29)
-  else if (range === 'custom' && search.from && DATE.test(search.from)) {
-    from = search.from
-    to = search.to && DATE.test(search.to) && search.to >= search.from ? search.to : end
-  } else from = shiftDays(end, -29)
-  const days = (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1
-  const interval = search.interval === 'day' || search.interval === 'month'
-    ? (search.interval === 'day' && days > 730 ? 'month' : search.interval)
-    : days > 92 ? 'month' : 'day'
-  return { range, from, to, interval: interval as 'day' | 'month' }
-}
+type Search = RangeSearch
 
 function Stat({ label, value, note, tone }: { label: string; value: string; note?: React.ReactNode; tone?: 'good' | 'bad' }) {
   return (
@@ -53,11 +26,12 @@ function Stat({ label, value, note, tone }: { label: string; value: string; note
 }
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireOwner()
   const search = await searchParams
   let report: SalesReport
   let overview: Overview
   try {
-    let resolved = resolveRange(search, null)
+    let resolved = resolveRange(search)
     ;[report, overview] = await Promise.all([
       adminApi<SalesReport>('/reports/sales', { query: { from: resolved.from, to: resolved.to, interval: resolved.interval } }),
       adminApi<Overview>('/reports/overview'),
@@ -72,7 +46,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     return <><PageHeader title="Dashboard" /><ErrorPanel error={e} /></>
   }
 
-  const { range } = resolveRange(search, null)
+  const { range } = resolveRange(search)
   const t = report.totals
   const all = report.allTime
 
@@ -87,7 +61,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <p className="text-[13px] text-muted-foreground">{overview.toPack} to pack · {overview.packing} packing</p>
         </Link>
         <Stat label="Sales today" value={money(overview.todaySales.revenueIncGst)} note={`${overview.todaySales.orders} order${overview.todaySales.orders === 1 ? '' : 's'} · inc GST`} />
-        <Stat label="This month, profit after marketing" value={money(overview.monthSales.profitAfterMarketingExGst)} tone={overview.monthSales.profitAfterMarketingExGst < 0 ? 'bad' : undefined} note={`from ${money(overview.monthSales.revenueExGst)} sales ex GST`} />
+        <Stat
+          label="This month, net profit"
+          value={money(overview.monthSales.netProfitExGst)}
+          tone={overview.monthSales.netProfitExGst < 0 ? 'bad' : undefined}
+          note={
+            overview.monthBudget.budgetExGst === null
+              ? <>{money(overview.monthSales.revenueExGst)} sales · <Link href="/marketing" className="underline">set a marketing budget</Link></>
+              : <>Marketing {money(overview.monthBudget.spentExGst)} of {money(overview.monthBudget.budgetExGst)} budget{overview.monthBudget.spentExGst > overview.monthBudget.budgetExGst ? <strong className="text-destructive"> (over)</strong> : null}</>
+          }
+        />
         <Link href="/orders?tab=unpaid" className="rounded-xl border bg-card p-4 transition-colors hover:border-primary">
           <p className="text-[13px] font-medium text-muted-foreground">Checkouts not paid (24 h)</p>
           <p className="mt-1 font-heading text-[28px] font-bold leading-tight">{overview.unpaidCheckoutsToday}</p>
@@ -118,7 +101,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <Stat label="Cost of parts" value={moneyShort(t.costOfGoodsExGst)} note={`${t.units.toLocaleString('en-AU')} parts sold`} />
         <Stat label="Gross profit" value={moneyShort(t.grossProfitExGst)} note={`${percent(t.grossMarginPct)} margin`} tone={t.grossProfitExGst < 0 ? 'bad' : undefined} />
         <Stat label="Marketing" value={moneyShort(t.marketingExGst)} note={<Link href="/marketing" className="underline">Add spend</Link>} />
-        <Stat label="Profit after marketing" value={moneyShort(t.profitAfterMarketingExGst)} tone={t.profitAfterMarketingExGst < 0 ? 'bad' : t.profitAfterMarketingExGst > 0 ? 'good' : undefined} note={t.revenueExGst > 0 ? `${percent((t.profitAfterMarketingExGst / t.revenueExGst) * 100)} of sales` : undefined} />
+        <Stat label="Net profit" value={moneyShort(t.netProfitExGst)} tone={t.netProfitExGst < 0 ? 'bad' : t.netProfitExGst > 0 ? 'good' : undefined} note={t.revenueExGst > 0 ? `${percent(t.netMarginPct)} of sales, after all costs` : 'after marketing, delivery and fees'} />
       </div>
 
       <Card
@@ -135,8 +118,23 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         )}
         <p className="mt-3 flex items-start gap-2 text-[13px] text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          Profit is sales minus what the parts cost from the supplier. What the carrier charges for delivery and card or PayPal fees are not taken off yet.
+          Gross profit is sales minus what the parts cost from the supplier. Net profit also takes off marketing, what delivery cost you (entered on each order) and estimated card and PayPal fees.
         </p>
+      </Card>
+
+      <Card title="Where the money went" description={`${report.from} to ${report.to}, ex GST`} className="mb-6">
+        <dl className="grid max-w-xl gap-1.5 text-sm">
+          <div className="flex justify-between gap-4"><dt>Sales</dt><dd className="num font-semibold">{money(t.revenueExGst)}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">less what the parts cost</dt><dd className="num">−{money(t.costOfGoodsExGst)}</dd></div>
+          <div className="flex justify-between gap-4 border-t pt-1.5"><dt>Gross profit</dt><dd className="num font-semibold">{money(t.grossProfitExGst)}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">less marketing</dt><dd className="num">−{money(t.marketingExGst)}</dd></div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">less what delivery cost us{t.ordersWithoutDeliveryCost > 0 ? <span className="block text-xs">{t.ordersWithoutDeliveryCost} order{t.ordersWithoutDeliveryCost === 1 ? '' : 's'} without a delivery cost entered</span> : null}</dt>
+            <dd className="num">−{money(t.deliveryCostExGst)}</dd>
+          </div>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">less card and PayPal fees <span className="text-xs">(estimated, <Link href="/settings" className="underline">rates</Link>)</span></dt><dd className="num">−{money(t.paymentFeesExGst)}</dd></div>
+          <div className="flex justify-between gap-4 border-t pt-1.5 text-base"><dt className="font-bold">Net profit</dt><dd className={`num font-bold ${t.netProfitExGst < 0 ? 'text-destructive' : ''}`}>{money(t.netProfitExGst)}</dd></div>
+        </dl>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -174,8 +172,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div><dt className="text-muted-foreground">Gross profit</dt><dd className="text-lg font-semibold">{money(all.grossProfitExGst)}</dd></div>
             <div><dt className="text-muted-foreground">Marketing</dt><dd className="text-lg font-semibold">{money(all.marketingExGst)}</dd></div>
             <div className="col-span-2 border-t pt-3">
-              <dt className="text-muted-foreground">Profit after marketing</dt>
-              <dd className={`font-heading text-3xl font-bold ${all.profitAfterMarketingExGst < 0 ? 'text-destructive' : ''}`}>{money(all.profitAfterMarketingExGst)}</dd>
+              <dt className="text-muted-foreground">Net profit, after marketing, delivery and fees</dt>
+              <dd className={`font-heading text-3xl font-bold ${all.netProfitExGst < 0 ? 'text-destructive' : ''}`}>{money(all.netProfitExGst)}</dd>
             </div>
             {report.refunds.orders > 0 && (
               <div className="col-span-2 text-[13px] text-muted-foreground">

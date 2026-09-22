@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { AlertTriangle } from 'lucide-react'
 import { adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { Rate, Zone } from '@/lib/types'
 import { PageHeader } from '@/components/page'
 import { ErrorPanel } from '@/components/ErrorPanel'
@@ -9,6 +10,7 @@ import { AddZone, ZoneCard } from '@/components/shipping/ShippingForms'
 export const metadata: Metadata = { title: 'Delivery' }
 
 export default async function ShippingPage() {
+  await requireOwner()
   let zones: Zone[]
   let rates: Rate[]
   try {

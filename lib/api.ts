@@ -5,8 +5,8 @@ import type { ActionState } from './types'
 /*
  * The only way this panel reaches data: the store's /api/admin/* over HTTPS,
  * with ADMIN_TOKEN, from the server. The token never reaches a browser, and
- * every request names the signed-in operator so the API can record who changed
- * what.
+ * every request names the signed-in operator and their role, so the API can
+ * record who changed what and keep cost figures from staff.
  */
 
 export class ApiError extends Error {
@@ -26,10 +26,18 @@ function base(): string {
   return url.replace(/\/+$/, '').replace(/\/api$/, '')
 }
 
-type Options = { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown; query?: Record<string, string | number | undefined | null> }
+type Options = {
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
+  body?: unknown
+  query?: Record<string, string | number | undefined | null>
+  // Raw bytes (a photo upload) instead of a JSON body.
+  raw?: { data: ArrayBuffer; contentType: string }
+  // Only for signing in, before there is an operator to name.
+  anonymous?: boolean
+}
 
-export async function adminApi<T>(path: string, { method = 'GET', body, query }: Options = {}): Promise<T> {
-  const operator = await requireOperator()
+export async function adminApi<T>(path: string, { method = 'GET', body, query, raw, anonymous = false }: Options = {}): Promise<T> {
+  const operator = anonymous ? null : await requireOperator()
   const token = process.env.ADMIN_TOKEN?.trim()
   if (!token) throw new ApiError(0, 'The panel’s ADMIN_TOKEN setting is empty. Copy ADMIN_TOKEN from the nav-pro-listing service on Railway into Vercel and redeploy.')
 
@@ -44,13 +52,13 @@ export async function adminApi<T>(path: string, { method = 'GET', body, query }:
       method,
       headers: {
         authorization: `Bearer ${token}`,
-        'x-admin-actor': operator.email,
-        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...(operator ? { 'x-admin-actor': operator.email, 'x-admin-role': operator.role } : {}),
+        ...(raw ? { 'content-type': raw.contentType } : body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: raw ? raw.data : body === undefined ? undefined : JSON.stringify(body),
       // Admin data is always current: never cached between requests.
       cache: 'no-store',
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(raw ? 60_000 : 30_000),
     })
   } catch {
     throw new ApiError(0, 'The store API could not be reached. Check your connection and try again.')
@@ -60,7 +68,7 @@ export async function adminApi<T>(path: string, { method = 'GET', body, query }:
   if (!response.ok) {
     const message =
       response.status === 401 ? 'The panel’s API token was refused. Check ADMIN_TOKEN matches the API.' :
-      response.status === 503 ? 'The admin API is switched off on the server (ADMIN_TOKEN is not set there).' :
+      response.status === 503 && !data?.error ? 'The admin API is switched off on the server (ADMIN_TOKEN is not set there).' :
       (data?.error as string | undefined) ?? `The store API answered ${response.status}.`
     throw new ApiError(response.status, message, data?.details)
   }

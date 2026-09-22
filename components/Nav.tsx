@@ -3,29 +3,38 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { BarChart3, LogOut, Megaphone, Menu, Package, ShoppingBag, Truck, X } from 'lucide-react'
+import { BarChart3, History, LogOut, Megaphone, Menu, Package, PieChart, Settings, ShoppingBag, Tags, Truck, Users, UsersRound, X } from 'lucide-react'
 import { signOut } from '@/app/sign-in/actions'
 import { cn } from '@/lib/utils'
 
-const LINKS = [
+type Role = 'owner' | 'staff'
+
+// Staff pack and ship: they see Orders only.
+const LINKS: { href: string; label: string; icon: typeof BarChart3; badge?: boolean; staff?: boolean; divider?: boolean }[] = [
   { href: '/', label: 'Dashboard', icon: BarChart3 },
-  { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: true },
+  { href: '/orders', label: 'Orders', icon: ShoppingBag, badge: true, staff: true },
   { href: '/products', label: 'Products', icon: Package },
+  { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/reports', label: 'Reports', icon: PieChart },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
+  { href: '/pricing', label: 'Pricing rules', icon: Tags, divider: true },
   { href: '/shipping', label: 'Delivery', icon: Truck },
+  { href: '/team', label: 'Team', icon: UsersRound },
+  { href: '/history', label: 'Change history', icon: History },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
 }
 
-function Links({ pathname, toPack, onNavigate }: { pathname: string; toPack: number | null; onNavigate?: () => void }) {
+function Links({ pathname, toPack, role, onNavigate }: { pathname: string; toPack: number | null; role: Role; onNavigate?: () => void }) {
   return (
     <ul className="grid gap-1">
-      {LINKS.map(({ href, label, icon: Icon, badge }) => {
+      {LINKS.filter((l) => role === 'owner' || l.staff).map(({ href, label, icon: Icon, badge, divider }) => {
         const active = isActive(pathname, href)
         return (
-          <li key={href}>
+          <li key={href} className={cn(divider && role === 'owner' && 'mt-3 border-t border-white/15 pt-3')}>
             <Link
               href={href}
               onClick={onNavigate}
@@ -50,10 +59,11 @@ function Links({ pathname, toPack, onNavigate }: { pathname: string; toPack: num
   )
 }
 
-function Account({ email }: { email: string }) {
+function Account({ email, role }: { email: string; role: Role }) {
   return (
     <div className="border-t border-white/15 pt-4">
       <p className="truncate px-3 text-xs text-brand-dim" title={email}>Signed in as {email}</p>
+      <p className="px-3 text-xs text-brand-dim">{role === 'owner' ? 'Owner' : 'Staff: orders only'}</p>
       <form action={signOut}>
         <button type="submit" className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-brand-ink/85 hover:bg-white/10 hover:text-brand-ink">
           <LogOut className="size-[18px]" aria-hidden="true" /> Sign out
@@ -63,7 +73,7 @@ function Account({ email }: { email: string }) {
   )
 }
 
-export function Nav({ email, toPack }: { email: string; toPack: number | null }) {
+export function Nav({ email, role, toPack }: { email: string; role: Role; toPack: number | null }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -82,7 +92,7 @@ export function Nav({ email, toPack }: { email: string; toPack: number | null })
     <>
       {/* Phones and tablets: a bar with a menu button. */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between bg-brand px-4 text-brand-ink lg:hidden">
-        <Link href="/" className="font-heading text-xl font-bold">Parts Finder admin</Link>
+        <Link href={role === 'owner' ? '/' : '/orders'} className="font-heading text-xl font-bold">Parts Finder admin</Link>
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -105,8 +115,8 @@ export function Nav({ email, toPack }: { email: string; toPack: number | null })
                 <X aria-hidden="true" /><span className="sr-only">Close menu</span>
               </button>
             </div>
-            <div className="flex-1"><Links pathname={pathname} toPack={toPack} onNavigate={() => setOpen(false)} /></div>
-            <Account email={email} />
+            <div className="flex-1"><Links pathname={pathname} toPack={toPack} role={role} onNavigate={() => setOpen(false)} /></div>
+            <Account email={email} role={role} />
           </nav>
         </div>
       )}
@@ -114,13 +124,13 @@ export function Nav({ email, toPack }: { email: string; toPack: number | null })
       {/* Desktop: a fixed sidebar. */}
       {/* The column carries the colour the full height; the menu inside stays in view. */}
       <div className="hidden bg-brand lg:block">
-      <nav aria-label="Main" className="sticky top-0 flex h-dvh flex-col gap-8 px-3 py-6 text-brand-ink">
+      <nav aria-label="Main" className="sticky top-0 flex h-dvh flex-col gap-6 overflow-y-auto px-3 py-6 text-brand-ink">
         <Link href="/" className="px-3 font-heading text-2xl font-bold leading-none">
           Parts Finder
           <span className="mt-1 block font-sans text-xs font-medium tracking-wide text-brand-dim">Admin</span>
         </Link>
-        <div className="flex-1"><Links pathname={pathname} toPack={toPack} /></div>
-        <Account email={email} />
+        <div className="flex-1"><Links pathname={pathname} toPack={toPack} role={role} /></div>
+        <Account email={email} role={role} />
       </nav>
       </div>
     </>
