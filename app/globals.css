@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * Light only, like the storefront. The vendored shadcn components carry dark:
+ * classes; tying them to a .dark class that is never set keeps them inert.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * The storefront's palette. Petrol for structure and navigation; orange only on
+ * things you can act on, with white text (#d04510 gives white 4.6:1, WCAG AA).
+ * Chart colours are chosen to stay distinct for common colour blindness.
+ */
+:root {
+  --background: #f5f7f8; --foreground: #14181d; --card: #fff; --card-foreground: #14181d;
+  --popover: #fff; --popover-foreground: #14181d; --primary: #d04510; --primary-foreground: #fff;
+  --primary-hover: #b33a0c;
+  --secondary: #e9edf0; --secondary-foreground: #14181d; --muted: #eef1f3; --muted-foreground: #5a6672;
+  --accent: #e9edf0; --accent-foreground: #14181d; --destructive: #b3302b;
+  --border: #dce2e6; --input: #93a1ab; --ring: #0e3a47; --radius: .75rem;
+  --success: #0f7a4a; --warning: #8a5a12; --action-text: #0e3a47;
+  --brand: #0e3a47; --brand-ink: #eaf4f7; --brand-dim: #9dbcc7;
+  --chart-revenue: #0e3a47; --chart-profit: #1a9e6c; --chart-cost: #9aa8b2; --chart-marketing: #d04510; --chart-net: #6b4fbb;
+  color-scheme: light;
+}
+
+@theme inline {
+  --font-sans: var(--font-body); --font-heading: var(--font-display);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
+  --color-brand: var(--brand); --color-brand-ink: var(--brand-ink); --color-brand-dim: var(--brand-dim);
+  --color-success: var(--success); --color-warning: var(--warning); --color-action-text: var(--action-text);
+  --radius-sm: .375rem; --radius-md: .5rem; --radius-lg: .75rem; --radius-xl: 1rem;
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; margin: 0; font-family: var(--font-body), system-ui, sans-serif; font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  button, a, input, select, summary, label { touch-action: manipulation; }
+  button:not(:disabled), summary, select, label[for] { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  h1, h2, h3 { font-family: var(--font-display), system-ui, sans-serif; letter-spacing: .005em; }
+  input, select, textarea { min-width: 0; }
+}
+
+/* Buttons: large enough to hit on a phone; orange ones carry white text. */
+.pf-button { min-height: 40px; padding-inline: 14px; gap: 8px; border-radius: 8px; font-size: 14px; }
+.pf-button[data-size=sm] { min-height: 32px; padding-inline: 10px; font-size: 13px; }
+.pf-button[data-size=lg] { min-height: 46px; padding-inline: 18px; font-size: 15px; }
+.pf-button[data-size^=icon] { min-width: 40px; padding: 8px; }
+.pf-button[data-variant=default] { background: var(--primary); color: var(--primary-foreground); }
+.pf-button[data-variant=default]:hover:not(:disabled) { background: var(--primary-hover); }
+.pf-button[data-variant=outline] { border-color: var(--input); background: var(--card); }
+.pf-button[data-variant=outline]:hover { background: var(--secondary); }
+
+[data-slot=input], [data-slot=textarea], [data-slot=select-trigger] { background: var(--card); min-height: 40px; font-size: 15px; }
+[data-slot=textarea] { min-height: 96px; }
+
+.skip-link { position: fixed; top: -80px; left: 16px; padding: 12px 20px; z-index: 100; background: var(--primary); color: var(--primary-foreground); border-radius: 8px; }
+.skip-link:focus { top: 16px; }
+
+/* Numbers in tables line up on the decimal point. */
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Data tables scroll sideways inside their card on narrow screens, never the page. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--muted-foreground); padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--card); }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover td { background: #f8fafb; }
+.data-table th.num, .data-table td.num { text-align: right; }
+
+.field-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field-help { font-size: 12.5px; color: var(--muted-foreground); margin-top: 5px; }
+.field-error { font-size: 13px; color: var(--destructive); margin-top: 5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
