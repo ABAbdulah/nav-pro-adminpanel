@@ -73,9 +73,10 @@ ATO and GST paid on stock and advertising is claimed back.
 - **Marketing** = spend entries in the period, ex GST.
 - **Profit after marketing** = gross profit − marketing.
 
-Not included yet, and labelled as such on the dashboard: what the carrier
-charges us for delivery, and card / PayPal fees. Both need data we do not
-record (Phase 5 adds an optional per-order delivery cost and an estimated fee).
+- **Net profit** (added in phase 5) = profit after marketing − what the
+  carrier charged us (entered per order) − estimated card / PayPal fees (rates
+  on the Settings page). Orders with no delivery cost entered are counted and
+  shown, so the figure is never silently incomplete.
 
 The product list separately shows, per part: cost, RRP, our price, and margin
 against both our price and RRP.
@@ -153,13 +154,30 @@ Admin panel (this repo):
 
 ## Status
 
-- 2026-09-22: plan written. Phase 1 built and tested, not deployed:
-  - Store API on branch `admin-panel-api`. The admin API suite passes 87 of 87
-    checks, including edits reaching the storefront and cart, and exact report
-    totals.
-  - Panel on branch `phase-1-panel`. Browser smoke checks pass 41 of 41 at
-    desktop and phone widths.
-  - To go live: apply the migration, deploy the API, then create the panel's
-    Vercel project with the env vars in `.env.example`.
-  - Not in phase 1, as planned: photo upload (phase 2), per-person accounts
-    (phase 4).
+- 2026-09-22: phase 1 built, tested and deployed (API on Railway, panel on
+  Vercel at https://nav-pro-adminpanel.vercel.app), migration 0001 applied.
+- 2026-09-23: phases 2 to 5 built and tested (store branch `admin-phases-2-5`,
+  panel branch `phases-2-5`), migration `0002-admin-panel-phases-3-5.sql`
+  written. What they added:
+  - **Phase 2, photos:** upload from the product page (drag and drop or choose,
+    resized in the browser, checked and converted to WebP on the server, stored
+    in R2 under a new address), "use the supplier's photo again".
+  - **Phase 3, reporting:** sales by category, brand, supplier or product with
+    margin, a monthly marketing budget against spend, CSV downloads of orders,
+    profit and the breakdown, bulk hide/show/reprice of ticked products, and a
+    pricing rules screen.
+  - **Phase 4, operators:** a team account per person with an emailed sign-in
+    code, owner and staff roles (staff see orders only, never cost or profit),
+    a change history screen with one-click undo of product edits, and edit
+    conflict protection when two people change the same product.
+  - **Phase 5, operations:** a customers screen, what delivery cost you per
+    order and estimated card/PayPal fees in a net profit figure, stock you hold
+    yourself (taken off when an order ships), and a new-order email to the team.
+- To go live: apply migration 0002, add the R2 and ADMIN_PANEL_URL settings on
+  Railway, merge both branches, then add team members on the Team page.
+
+### Left for later (not requested)
+
+- A gallery of several photos per product (the storefront shows one).
+- Showing our own stock on the storefront, and holding stock for unpaid carts.
+- Public fitment overrides ("fits these vehicles") edited in the panel.

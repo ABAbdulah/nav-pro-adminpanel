@@ -16,6 +16,11 @@ export type Figures = {
   grossMarginPct: number | null
   marketingExGst: number
   profitAfterMarketingExGst: number
+  deliveryCostExGst: number
+  ordersWithoutDeliveryCost: number
+  paymentFeesExGst: number
+  netProfitExGst: number
+  netMarginPct: number | null
   averageOrderIncGst: number | null
   linesWithoutCost: number
 }
@@ -32,6 +37,25 @@ export type SalesReport = {
   topProducts: { partId: number | null; partNo: string; title: string; units: number; revenueIncGst: number; profitExGst: number | null }[]
 }
 
+export type Breakdown = {
+  from: string
+  to: string
+  by: 'category' | 'brand' | 'supplier' | 'product'
+  sort: 'revenue' | 'profit' | 'margin' | 'units'
+  items: {
+    key: string
+    label: string
+    partId: number | null
+    orders: number
+    units: number
+    revenueIncGst: number
+    revenueExGst: number
+    costExGst: number | null
+    profitExGst: number | null
+    marginPct: number | null
+  }[]
+}
+
 export type Overview = {
   today: string
   timezone: string
@@ -41,6 +65,7 @@ export type Overview = {
   unpaidCheckoutsToday: number
   todaySales: Figures
   monthSales: Figures
+  monthBudget: { month: string; budgetExGst: number | null; spentExGst: number }
   paymentsNeedingAttention: { orderNo: string; status: string; provider: string; amountIncGst: number; at: string }[]
 }
 
@@ -69,6 +94,26 @@ export type Page<T> = { total: number; page: number; limit: number; items: T[] }
 export type Change = { from: unknown; to: unknown }
 export type HistoryEntry = { actor: string | null; action: string; changes: Record<string, Change> | null; at: string }
 
+export type OrderLine = {
+  partId: number | null
+  partNo: string
+  brand: string | null
+  title: string
+  image: string | null
+  qty: number
+  unitIncGst: number
+  lineIncGst: number
+  supplier: string | null
+  supplierSku: string | null
+  supplierBrand: string | null
+  supplierTitle: string | null
+  ownStock: { qty: number; location: string | null } | null
+  // Absent for staff.
+  unitCostExGst?: number | null
+  lineCostExGst?: number | null
+  lineProfitExGst?: number | null
+}
+
 export type OrderDetail = {
   orderNo: string
   status: OrderStatus
@@ -94,24 +139,10 @@ export type OrderDetail = {
   trackingNumber: string | null
   trackingUrl: string | null
   nextStatuses: OrderStatus[]
-  profit: { revenueExGst: number; costOfGoodsExGst: number | null; grossProfitExGst: number | null; grossMarginPct: number | null }
-  items: {
-    partId: number | null
-    partNo: string
-    brand: string | null
-    title: string
-    image: string | null
-    qty: number
-    unitIncGst: number
-    lineIncGst: number
-    supplier: string | null
-    supplierSku: string | null
-    supplierBrand: string | null
-    supplierTitle: string | null
-    unitCostExGst: number | null
-    lineCostExGst: number | null
-    lineProfitExGst: number | null
-  }[]
+  // Absent for staff.
+  shippingCostExGst?: number | null
+  profit?: { revenueExGst: number; costOfGoodsExGst: number | null; grossProfitExGst: number | null; grossMarginPct: number | null }
+  items: OrderLine[]
   payments: {
     provider: string
     intentId: string
@@ -138,6 +169,7 @@ export type ProductRow = {
   costIncGst: number | null
   marginPct: number | null
   stock: string | null
+  ownStock: number | null
   published: boolean
   edited: boolean
   editedAt: string | null
@@ -185,6 +217,7 @@ export type ProductDetail = {
     rrpMarginPct: number | null
     history: { costExGst: number | null; costIncGst: number | null; rrpIncGst: number | null; at: string }[]
   }
+  ownStock: { qty: number; location: string | null; updatedBy: string | null; updatedAt: string } | null
   stock: { national: string | null; warehouse: number | null; at: string } | null
   categories: { category: string; vehicles: number }[]
   sales: { units: number; orders: number; revenueIncGst: number }
@@ -202,6 +235,8 @@ export type Spend = {
   createdBy: string | null
   createdAt: string
 }
+
+export type Budget = { month: string; budgetExGst: number | null; spentExGst: number; updatedBy: string | null }
 
 export type Zone = {
   id: string
@@ -223,6 +258,60 @@ export type Rate = {
   eta_text: string | null
   priority: number
   is_active: boolean
+}
+
+export type PriceRule = { id: string; brand: string | null; category: string | null; markup_pct: string; priority: number; created_at: string }
+export type BrandCode = { code: string; name: string; parts: number }
+
+export type Customer = {
+  email: string
+  name: string
+  phone: string
+  orders: number
+  spentIncGst: number
+  firstOrderAt: string | null
+  lastOrderAt: string | null
+  hasAccount: boolean
+}
+
+export type CustomerDetail = {
+  email: string
+  name: string
+  phone: string
+  lastAddress: OrderDetail['shipAddress']
+  account: { name: string | null; phone: string | null; createdAt: string } | null
+  orders: number
+  spentIncGst: number
+  history: { orderNo: string; status: OrderStatus; totalIncGst: number; items: number; paidAt: string | null; createdAt: string }[]
+}
+
+export type AuditEntry = {
+  id: number
+  actor: string | null
+  entity: string
+  entityId: string
+  label: string | null
+  action: string
+  changes: Record<string, Change> | null
+  at: string
+  revertible: boolean
+}
+
+export type TeamMember = {
+  id: number
+  email: string
+  name: string | null
+  role: 'owner' | 'staff'
+  isActive: boolean
+  createdBy: string | null
+  createdAt: string
+  lastLoginAt: string | null
+}
+
+export type Fee = { pct: number; fixed: number }
+export type Settings = {
+  payment_fees: { value: { stripe: Fee; paypal: Fee }; updatedBy: string | null; updatedAt: string | null }
+  order_alert_emails: { value: string[]; updatedBy: string | null; updatedAt: string | null }
 }
 
 /** A server action's result, shaped for useActionState. */

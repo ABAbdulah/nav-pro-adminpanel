@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState, useState } from 'react'
-import { ImageOff } from 'lucide-react'
-import { saveProduct } from '@/app/(panel)/products/actions'
+import { useActionState, useEffect, useRef, useState } from 'react'
+import { ImageOff, LoaderCircle, Upload } from 'lucide-react'
+import { saveProduct, uploadPhoto } from '@/app/(panel)/products/actions'
 import type { ActionState, ProductDetail } from '@/lib/types'
 import { money, percent } from '@/lib/format'
 import { FieldError, FormMessage, SubmitButton } from '@/components/forms'
@@ -31,18 +31,109 @@ function Photo({ src, label }: { src: string | null; label: string }) {
   )
 }
 
+/*
+ * Photos from phones are often 5-10 MB. They are drawn onto a canvas and saved
+ * as JPEG at up to 2000 px here, so the upload is around 1 MB and fits the
+ * hosting limits; the server then makes the storefront's WebP from that.
+ */
+async function shrink(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('unreadable'))
+      el.src = url
+    })
+    const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode'))), 'image/jpeg', 0.9))
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+function PhotoUpload({ productId, onUploaded }: { productId: number; onUploaded: (url: string, updatedAt: string | null) => void }) {
+  const input = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [over, setOver] = useState(false)
+  const [result, setResult] = useState<ActionState>({})
+
+  async function send(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setResult({ error: 'That file isn’t a photo. Choose a JPEG, PNG, WebP or iPhone photo.' })
+      return
+    }
+    setBusy(true)
+    setResult({})
+    try {
+      const blob = await shrink(file)
+      const form = new FormData()
+      form.set('photo', new File([blob], 'photo.jpg', { type: 'image/jpeg' }))
+      const out = await uploadPhoto(productId, form)
+      setResult(out)
+      if (out.ok && out.imageUrl) onUploaded(out.imageUrl, out.updatedAt ?? null)
+    } catch {
+      setResult({ error: 'That photo couldn’t be opened here. Try saving it as a JPEG first.' })
+    } finally {
+      setBusy(false)
+      if (input.current) input.current.value = ''
+    }
+  }
+
+  return (
+    <div className="grid gap-2">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); void send(e.dataTransfer.files[0]) }}
+        className={cn('grid place-items-center gap-2 rounded-lg border-2 border-dashed p-5 text-center text-sm', over ? 'border-brand bg-[#f3f8fa]' : 'border-input')}
+      >
+        {busy ? (
+          <p className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Uploading…</p>
+        ) : (
+          <>
+            <Upload className="size-5 text-muted-foreground" aria-hidden="true" />
+            <p>Drag a photo here, or</p>
+            <button type="button" onClick={() => input.current?.click()} className="pf-button inline-flex items-center rounded-lg border border-input bg-card font-medium hover:bg-secondary">
+              Choose a photo
+            </button>
+            <p className="text-xs text-muted-foreground">JPEG, PNG, WebP or an iPhone photo. It is resized for the store automatically.</p>
+          </>
+        )}
+        <input ref={input} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-label="Photo file" onChange={(e) => void send(e.target.files?.[0])} />
+      </div>
+      <FormMessage state={result} />
+    </div>
+  )
+}
+
 export function ProductEditor({ product }: { product: ProductDetail }) {
   const [state, action] = useActionState<ActionState, FormData>(saveProduct.bind(null, product.id), {})
   const { override, supplier, pricing } = product
   const [priceMode, setPriceMode] = useState<'auto' | 'custom'>(override.sellIncGst === null ? 'auto' : 'custom')
   const [price, setPrice] = useState(override.sellIncGst?.toFixed(2) ?? supplier.autoSellIncGst?.toFixed(2) ?? '')
   const [imageUrl, setImageUrl] = useState(override.imageUrl ?? '')
+  // Which version of the product this form is editing. An upload saves the
+  // product too, so it moves this on; otherwise the next save would look like
+  // it came from an out-of-date page.
+  const [version, setVersion] = useState(override.updatedAt ?? '')
+  useEffect(() => setVersion(override.updatedAt ?? ''), [override.updatedAt])
   const typed = Number(price.replace(/[$,\s]/g, ''))
   const liveMargin = priceMode === 'custom' ? marginFor(typed, pricing.costExGst) : marginFor(supplier.autoSellIncGst ?? 0, pricing.costExGst)
   const autoLabel = pricing.rrpIncGst ? 'the supplier’s RRP' : 'cost plus the markup rule'
 
   return (
     <form action={action} className="grid gap-6">
+      {/* The edit is refused if someone else saved this product after this page loaded. */}
+      <input type="hidden" name="ifUnchangedSince" value={version} />
       <div>
         <label htmlFor="title" className="field-label">Title on the store</label>
         <Input id="title" name="title" defaultValue={override.title ?? ''} placeholder={product.current.title} maxLength={300} aria-describedby="title-help" />
@@ -94,15 +185,20 @@ export function ProductEditor({ product }: { product: ProductDetail }) {
         </p>
       </fieldset>
 
-      <div>
-        <label htmlFor="imageUrl" className="field-label">Photo</label>
-        <div className="mb-3 flex flex-wrap gap-4">
-          <Photo src={imageUrl || supplier.image} label={imageUrl ? 'Your photo' : 'Supplier’s photo (in use)'} />
+      <div className="grid gap-3">
+        <span className="field-label">Photo</span>
+        <div className="flex flex-wrap gap-4">
+          <Photo src={imageUrl || supplier.image} label={imageUrl ? 'Your photo (in use)' : 'Supplier’s photo (in use)'} />
           {imageUrl && <Photo src={supplier.image} label="Supplier’s photo" />}
         </div>
-        <Input id="imageUrl" name="imageUrl" type="url" inputMode="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value.trim())} placeholder="https://…" aria-describedby="image-help" />
-        <p id="image-help" className="field-help">Paste a link to a photo to use instead of the supplier’s. Leave empty to use the supplier’s photo. Uploading from your computer is coming next.</p>
-        {imageUrl && <button type="button" onClick={() => setImageUrl('')} className="mt-1 min-h-9 text-sm font-medium text-action-text underline">Use the supplier’s photo again</button>}
+        <PhotoUpload productId={product.id} onUploaded={(url, at) => { setImageUrl(url); setVersion(at ?? '') }} />
+        <details className="text-sm">
+          <summary className="min-h-9 font-medium text-action-text">Or paste a link to a photo</summary>
+          <Input id="imageUrl" type="url" aria-label="Link to a photo" inputMode="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value.trim())} placeholder="https://…" className="mt-2" />
+        </details>
+        {/* Sent with the form even while the link box is closed. */}
+        <input type="hidden" name="imageUrl" value={imageUrl} />
+        {imageUrl && <button type="button" onClick={() => setImageUrl('')} className="min-h-9 justify-self-start text-sm font-medium text-action-text underline">Use the supplier’s photo again (then save)</button>}
         <FieldError state={state} name="imageUrl" />
       </div>
 
@@ -122,6 +218,9 @@ export function ProductEditor({ product }: { product: ProductDetail }) {
 
       <div className="sticky bottom-0 -mx-4 grid gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
         <FormMessage state={state} />
+        {state.source === 'conflict' && (
+          <a href={`/products/${product.id}`} className="justify-self-start text-sm font-semibold text-action-text underline">Reload this product</a>
+        )}
         <SubmitButton size="lg" pendingLabel="Saving…" className="w-full sm:w-auto sm:justify-self-start">Save changes</SubmitButton>
       </div>
     </form>

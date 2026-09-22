@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { ApiError, adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { ActionState } from '@/lib/types'
 
 const STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT']
@@ -21,6 +22,7 @@ async function run(fn: () => Promise<unknown>, message: string): Promise<ActionS
 }
 
 export async function saveZone(id: number | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireOwner()
   const name = text(form, 'name')
   const everywhere = form.get('everywhere') === 'on'
   const states = STATES.filter((s) => form.get(`state-${s}`) === 'on')
@@ -49,10 +51,12 @@ export async function saveZone(id: number | null, _prev: ActionState, form: Form
 }
 
 export async function deleteZone(id: number, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  await requireOwner()
   return run(() => adminApi(`/shipping/zones/${id}`, { method: 'DELETE' }), 'Delivery area deleted.')
 }
 
 export async function saveRate(id: number | null, zoneId: number, _prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireOwner()
   const name = text(form, 'name')
   const price = amount(text(form, 'price'))
   const freeOverText = text(form, 'freeOver')
@@ -79,5 +83,6 @@ export async function saveRate(id: number | null, zoneId: number, _prev: ActionS
 }
 
 export async function deleteRate(id: number, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  await requireOwner()
   return run(() => adminApi(`/shipping/rates/${id}`, { method: 'DELETE' }), 'Delivery option deleted.')
 }

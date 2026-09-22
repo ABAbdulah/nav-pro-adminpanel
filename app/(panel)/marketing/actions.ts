@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { ApiError, adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { ActionState } from '@/lib/types'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -32,17 +33,37 @@ async function run(fn: () => Promise<unknown>, message: string): Promise<ActionS
 }
 
 export async function addSpend(_prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireOwner()
   const read = readSpend(form)
   if ('error' in read) return read.error
   return run(() => adminApi('/marketing', { method: 'POST', body: read.body }), 'Added. The dashboard includes it now.')
 }
 
 export async function updateSpend(id: number, _prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireOwner()
   const read = readSpend(form)
   if ('error' in read) return read.error
   return run(() => adminApi(`/marketing/${id}`, { method: 'PATCH', body: read.body }), 'Saved.')
 }
 
 export async function deleteSpend(id: number, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  await requireOwner()
   return run(() => adminApi(`/marketing/${id}`, { method: 'DELETE' }), 'Deleted.')
+}
+
+/** Set a month's budget (ex GST), or clear it with an empty amount. */
+export async function saveBudget(month: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireOwner()
+  const raw = String(form.get('amount') ?? '').replace(/[$,\s]/g, '')
+  const amount = raw === '' ? null : Number(raw)
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return { error: 'Enter the budget as a number, like 500, or leave it empty.' }
+  try {
+    await adminApi(`/marketing/budgets/${month}`, { method: 'PUT', body: { amountExGst: amount === null ? null : Math.round(amount * 100) / 100 } })
+  } catch (e) {
+    if (e instanceof ApiError) return { error: e.message }
+    throw e
+  }
+  revalidatePath('/marketing')
+  revalidatePath('/')
+  return { ok: true, message: amount === null ? 'Budget cleared.' : 'Budget saved.' }
 }

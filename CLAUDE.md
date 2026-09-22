@@ -3,14 +3,13 @@
 The operator portal for the Parts Finder car-parts store. Read this before
 touching the repo; the store's full map is `../nav-pro-listing/CLAUDE.md`.
 
-## Status (2026-09-22)
+## Status (2026-09-23)
 
-Phase 1 of `docs/plan.md` is built on branch `phase-1-panel`: sign-in,
-dashboard, orders, products, marketing and delivery. The API side is on the
-store repo's branch `admin-panel-api` and needs its migration
-(`db/migrations/0001-admin-panel-foundations.sql`) applied before it is
-deployed. Nothing is deployed yet. The plan lists what the next phases add and
-the defaults chosen to start (framework, hosting, sign-in, charts, look).
+Phases 1 to 5 of `docs/plan.md` are built. Phase 1 is live on Vercel
+(https://nav-pro-adminpanel.vercel.app). Phases 2 to 5 are on branch
+`phases-2-5`, with the API side on the store repo's `admin-phases-2-5`; they
+need migration `0002-admin-panel-phases-3-5.sql` and the R2 settings on the
+API before the photo upload works in production.
 
 ## Working rules
 
@@ -70,17 +69,25 @@ without it), `STOREFRONT_URL` (optional).
 | Path | What |
 |---|---|
 | `proxy.ts` | Optimistic redirect to `/sign-in` when there is no cookie. Not the security check |
-| `lib/session.ts` | Signed cookie `pf_admin` (HMAC with `SESSION_SECRET`, 12 h), allow-listed emails, `requireOperator()` used by every page and action |
+| `lib/session.ts` | Signed cookie `pf_admin` (HMAC with `SESSION_SECRET`, 12 h) with email, role and how they signed in; team accounts re-checked with the API about once a minute; `requireOperator()` for every page and action, `requireOwner()` for owner-only ones |
 | `lib/api.ts` | `adminApi()`: the only fetch to the store API; `ApiError` |
 | `lib/types.ts` | API response shapes, `ActionState` for forms |
 | `lib/format.ts` | Money, dates in Australia/Sydney, status labels |
-| `app/sign-in/*` | Sign-in page, `signIn` / `signOut` actions (per-instance failed-attempt limit) |
+| `app/sign-in/*` | Emailed-code sign-in for team accounts (default) and the shared owner password for `ADMIN_EMAILS`; per-instance failed-attempt limit |
 | `app/(panel)/layout.tsx` | Verifies the session, renders `components/Nav.tsx` (sidebar on desktop, menu on phones, "to send" badge) |
 | `app/(panel)/page.tsx` | Dashboard: queue and today/month cards, payment alerts, period controls (URL-driven), KPI tiles, `components/dashboard/SalesChart.tsx` (Recharts, series toggles, table view), best sellers, since-opening totals |
 | `app/(panel)/orders/*` | List with tabs (to send, shipped, all paid, not paid, refunded, cancelled), search, `AutoRefresh` every 60 s; detail with timeline, lines with supplier/SKU/cost/profit, payments, history; `components/orders/OrderActions.tsx` (pack, ship + email, tracking, notes, cancel, refund) |
 | `app/(panel)/products/*` | List with filters, cost/RRP/price/margin; edit page with `components/products/ProductEditor.tsx` (title, description, own price with live margin, photo by link, show/hide, notes) |
 | `app/(panel)/marketing/*` | Add, edit, delete spend; totals by month and channel |
 | `app/(panel)/shipping/*` | Delivery areas (zones) and options (rates) |
+| `app/(panel)/reports/*`, `app/export/[kind]/route.ts`, `lib/csv.ts` | Sales by category, brand, supplier or product; CSV downloads (orders, profit, breakdown), formula-safe |
+| `app/(panel)/customers/*` | Customers grouped by email, and each one's orders |
+| `app/(panel)/pricing/*` | Markup rules for parts with no RRP |
+| `app/(panel)/team/*` | Team accounts and roles |
+| `app/(panel)/history/*` | Change history with undo of product edits |
+| `app/(panel)/settings/*` | Card/PayPal fee estimates, new-order email recipients |
+| `components/products/BulkBar.tsx`, `StockForm.tsx` | Bulk changes on ticked products (checkboxes join the form by its id); our own stock |
+| `lib/range.ts` | Report date ranges from the URL, shared by the dashboard and Reports |
 | `components/page.tsx`, `forms.tsx`, `History.tsx`, `ErrorPanel.tsx` | Shared pieces. `ErrorPanel` imports the server-only API module, so it stays out of client components |
 | `components/ui/*` | shadcn primitives copied from the storefront. Do not edit or deslop |
 
@@ -90,6 +97,10 @@ without it), `STOREFRONT_URL` (optional).
 - React resets a form after its action finishes. Tests that submit twice must wait for the first result or reload the page, or the reset wipes what they typed.
 - A form that disappears after its action (the order moves on) loses its message. Order status changes share one message area at the top of the card for that reason.
 - `loading.tsx` streams first, so a test that reads `main` right after `goto` sees the skeleton. Wait for `main h1`.
+- Staff get order data without cost fields from the API (`X-Admin-Role: staff`). Anything a client component receives is visible in the browser, so owner-only figures must never be fetched for a staff session rather than just hidden.
+- An upload saves the product. The editor tracks the product's version (`ifUnchangedSince`) and moves it on after an upload, or the next save looks like a conflicting edit.
+- Vercel limits a request to 4.5 MB, so photos are shrunk in the browser (`shrink()` in ProductEditor) before the server action sends them on.
+- In smoke runs the panel serves as production, so its cookie is `secure`: Playwright's own HTTP client will not send it over http. Fetch from inside the page instead.
 
 ## Design
 

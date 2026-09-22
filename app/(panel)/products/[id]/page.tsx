@@ -2,12 +2,14 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ExternalLink } from 'lucide-react'
 import { ApiError, adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { ProductDetail } from '@/lib/types'
 import { date, dateTime, money, percent, STOCK_LABEL } from '@/lib/format'
 import { Card, PageHeader, Pill } from '@/components/page'
 import { ErrorPanel } from '@/components/ErrorPanel'
 import { History } from '@/components/History'
 import { ProductEditor } from '@/components/products/ProductEditor'
+import { StockForm } from '@/components/products/StockForm'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -29,6 +31,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default async function ProductPage({ params }: Props) {
+  await requireOwner()
   const id = Number((await params).id)
   if (!Number.isSafeInteger(id) || id <= 0) notFound()
 
@@ -101,9 +104,13 @@ export default async function ProductPage({ params }: Props) {
             {supplier.comments && <p className="mt-2 text-sm text-muted-foreground">Supplier note: {supplier.comments}</p>}
           </Card>
 
+          <Card title="Our own stock" description="Parts you keep yourself, separate from the supplier’s stock.">
+            <StockForm product={product} />
+          </Card>
+
           <Card title="Stock and sales">
             <dl className="divide-y">
-              <Row label="Supplier stock">{STOCK_LABEL[current.stock] ?? current.stock}{product.stock?.warehouse !== null && product.stock?.warehouse !== undefined ? ` (${product.stock.warehouse} in warehouse)` : ''}</Row>
+              <Row label="Supplier’s stock">{STOCK_LABEL[current.stock] ?? current.stock}{product.stock?.warehouse !== null && product.stock?.warehouse !== undefined ? ` (${product.stock.warehouse} in warehouse)` : ''}</Row>
               <Row label="Sold through the store">{product.sales.units} in {product.sales.orders} order{product.sales.orders === 1 ? '' : 's'}</Row>
               <Row label="Sales, inc GST">{money(product.sales.revenueIncGst)}</Row>
             </dl>

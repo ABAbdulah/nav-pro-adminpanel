@@ -7,14 +7,14 @@ import type { Figures } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 type Point = Figures & { period: string }
-type Key = 'revenueExGst' | 'costOfGoodsExGst' | 'grossProfitExGst' | 'marketingExGst' | 'profitAfterMarketingExGst' | 'orders'
+type Key = 'revenueExGst' | 'costOfGoodsExGst' | 'grossProfitExGst' | 'marketingExGst' | 'netProfitExGst' | 'orders'
 
 const SERIES: { key: Key; label: string; color: string; kind: 'bar' | 'line'; axis: 'money' | 'count'; on: boolean }[] = [
   { key: 'revenueExGst', label: 'Sales', color: 'var(--chart-revenue)', kind: 'bar', axis: 'money', on: true },
   { key: 'costOfGoodsExGst', label: 'Cost of parts', color: 'var(--chart-cost)', kind: 'bar', axis: 'money', on: false },
   { key: 'grossProfitExGst', label: 'Gross profit', color: 'var(--chart-profit)', kind: 'line', axis: 'money', on: true },
   { key: 'marketingExGst', label: 'Marketing', color: 'var(--chart-marketing)', kind: 'line', axis: 'money', on: true },
-  { key: 'profitAfterMarketingExGst', label: 'Profit after marketing', color: 'var(--chart-net)', kind: 'line', axis: 'money', on: false },
+  { key: 'netProfitExGst', label: 'Net profit', color: 'var(--chart-net)', kind: 'line', axis: 'money', on: false },
   { key: 'orders', label: 'Orders', color: '#8a5a12', kind: 'line', axis: 'count', on: false },
 ]
 
@@ -31,7 +31,8 @@ function ChartTooltip({ active, payload, interval }: { active?: boolean; payload
         <dt className="text-muted-foreground">Gross profit</dt><dd className="num">{money(p.grossProfitExGst)}</dd>
         <dt className="text-muted-foreground">Margin</dt><dd className="num">{percent(p.grossMarginPct)}</dd>
         <dt className="text-muted-foreground">Marketing</dt><dd className="num">{money(p.marketingExGst)}</dd>
-        <dt className="font-semibold">After marketing</dt><dd className="num font-semibold">{money(p.profitAfterMarketingExGst)}</dd>
+        <dt className="text-muted-foreground">Delivery cost and fees</dt><dd className="num">{money(p.deliveryCostExGst + p.paymentFeesExGst)}</dd>
+        <dt className="font-semibold">Net profit</dt><dd className="num font-semibold">{money(p.netProfitExGst)}</dd>
       </dl>
     </div>
   )
@@ -95,7 +96,7 @@ export function SalesChart({ series, interval }: { series: Point[]; interval: 'd
         <div className="table-wrap mt-2 max-h-96 rounded-lg border">
           <table className="data-table">
             <thead>
-              <tr><th>{interval === 'month' ? 'Month' : 'Day'}</th><th className="num">Orders</th><th className="num">Sales ex GST</th><th className="num">Cost of parts</th><th className="num">Gross profit</th><th className="num">Margin</th><th className="num">Marketing</th><th className="num">After marketing</th></tr>
+              <tr><th>{interval === 'month' ? 'Month' : 'Day'}</th><th className="num">Orders</th><th className="num">Sales ex GST</th><th className="num">Cost of parts</th><th className="num">Gross profit</th><th className="num">Margin</th><th className="num">Marketing</th><th className="num">Net profit</th></tr>
             </thead>
             <tbody>
               {series.map((p) => (
@@ -107,7 +108,7 @@ export function SalesChart({ series, interval }: { series: Point[]; interval: 'd
                   <td className="num">{money(p.grossProfitExGst)}</td>
                   <td className="num">{percent(p.grossMarginPct)}</td>
                   <td className="num">{money(p.marketingExGst)}</td>
-                  <td className="num">{money(p.profitAfterMarketingExGst)}</td>
+                  <td className="num">{money(p.netProfitExGst)}</td>
                 </tr>
               ))}
             </tbody>

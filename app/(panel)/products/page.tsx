@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ImageOff, Search } from 'lucide-react'
 import { adminApi } from '@/lib/api'
+import { requireOwner } from '@/lib/session'
 import type { Page, ProductRow } from '@/lib/types'
 import { money, percent, STOCK_LABEL } from '@/lib/format'
 import { EmptyState, PageHeader, Pagination, Pill, withParams } from '@/components/page'
 import { ErrorPanel } from '@/components/ErrorPanel'
+import { BULK_FORM, BulkBar } from '@/components/products/BulkBar'
 
 export const metadata: Metadata = { title: 'Products' }
 
@@ -16,6 +18,7 @@ const STATUS = [
   { value: 'published', label: 'Shown on the store' },
   { value: 'hidden', label: 'Hidden from the store' },
   { value: 'edited', label: 'Changed in the panel' },
+  { value: 'stocked', label: 'Held in our own stock' },
 ]
 const PHOTO = [
   { value: 'any', label: 'With or without a photo' },
@@ -50,6 +53,7 @@ function marginTone(m: number | null): 'good' | 'warn' | 'bad' | 'muted' {
 }
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  await requireOwner()
   const search = await searchParams
   const page = Math.max(1, Number(search.page) || 1)
   const filters = {
@@ -91,14 +95,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <p className="mb-3 text-sm text-muted-foreground">{data.total.toLocaleString('en-AU')} product{data.total === 1 ? '' : 's'}. Cost is ex GST; RRP and our price include GST. Margin is on our price ex GST.</p>
 
+      {data.items.length > 0 && <BulkBar />}
+
       {data.items.length === 0 ? (
         <EmptyState title="No products match">Try fewer words, or a different filter.</EmptyState>
       ) : (
         <>
           <ul className="grid gap-2 md:hidden">
             {data.items.map((p) => (
-              <li key={p.id}>
-                <Link href={`/products/${p.id}`} className="flex gap-3 rounded-xl border bg-card p-3 active:bg-secondary">
+              <li key={p.id} className="flex items-start gap-2">
+                <input type="checkbox" name="ids" value={p.id} form={BULK_FORM} className="mt-5 size-5 shrink-0" aria-label={`Tick ${p.partNo}`} />
+                <Link href={`/products/${p.id}`} className="flex min-w-0 flex-1 gap-3 rounded-xl border bg-card p-3 active:bg-secondary">
                   {p.image ? <img src={p.image} alt="" width={64} height={64} loading="lazy" className="size-16 shrink-0 rounded-md border bg-white object-contain" /> : <span className="grid size-16 shrink-0 place-items-center rounded-md border bg-muted text-muted-foreground"><ImageOff className="size-5" aria-hidden="true" /></span>}
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 font-medium leading-snug">{p.title}</p>
@@ -110,6 +117,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       <Pill tone={marginTone(p.marginPct)}>{percent(p.marginPct)} margin</Pill>
                       {!p.published && <Pill tone="bad">Hidden</Pill>}
                       {p.edited && <Pill tone="info">Changed</Pill>}
+                      {p.ownStock !== null && <Pill tone="good">We hold {p.ownStock}</Pill>}
                     </div>
                   </div>
                 </Link>
@@ -121,6 +129,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             <table className="data-table">
               <thead>
                 <tr>
+                  <th className="w-10"><input type="checkbox" data-select-all="true" className="size-4" aria-label="Tick every product on this page" /></th>
                   <th><span className="sr-only">Photo</span></th><th>Product</th><th>Supplier</th>
                   <th className="num">Cost ex GST</th><th className="num">RRP</th><th className="num">Our price</th><th className="num">Margin</th><th>Stock</th><th>Store</th>
                 </tr>
@@ -128,6 +137,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {data.items.map((p) => (
                   <tr key={p.id}>
+                    <td><input type="checkbox" name="ids" value={p.id} form={BULK_FORM} className="size-4" aria-label={`Tick ${p.partNo}`} /></td>
                     <td className="w-14">
                       {p.image ? <img src={p.image} alt="" width={44} height={44} loading="lazy" className="size-11 rounded-md border bg-white object-contain" /> : <span className="grid size-11 place-items-center rounded-md border bg-muted text-muted-foreground" title="No photo"><ImageOff className="size-4" aria-hidden="true" /></span>}
                     </td>
@@ -143,7 +153,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                     <td className="num">{money(p.rrpIncGst)}</td>
                     <td className="num font-semibold">{money(p.sellIncGst)}</td>
                     <td className="num"><Pill tone={marginTone(p.marginPct)}>{percent(p.marginPct)}</Pill></td>
-                    <td className="whitespace-nowrap text-[13px]">{p.stock ? STOCK_LABEL[p.stock] ?? p.stock : '—'}</td>
+                    <td className="whitespace-nowrap text-[13px]">
+                      {p.stock ? STOCK_LABEL[p.stock] ?? p.stock : '—'}
+                      {p.ownStock !== null && <span className="block text-xs font-semibold text-success">We hold {p.ownStock}</span>}
+                    </td>
                     <td className="whitespace-nowrap">
                       {p.published ? <Pill tone="good">Shown</Pill> : <Pill tone="bad">Hidden</Pill>}
                       {p.edited && <span className="ml-1"><Pill tone="info">Changed</Pill></span>}

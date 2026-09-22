@@ -9,6 +9,9 @@ const nextConfig = {
     // shadcn imports every primitive through the radix-ui umbrella; without this
     // each page downloads Dialog, Select and the rest whether it uses them or not.
     optimizePackageImports: ['radix-ui'],
+    // Photo uploads go through a server action. The browser shrinks photos to
+    // about 1 MB first, well under Vercel's 4.5 MB request limit.
+    serverActions: { bodySizeLimit: '6mb' },
   },
   async headers() {
     return [

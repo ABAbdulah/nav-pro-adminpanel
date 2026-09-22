@@ -16,7 +16,7 @@ export function History({ entries, labels }: { entries: HistoryEntry[]; labels: 
   return (
     <ol className="grid gap-3">
       {entries.map((entry, i) => (
-        <li key={`${entry.at}-${i}`} className="border-l-2 pl-3 text-sm">
+        <li key={`${entry.at}-${i}`} className="border-l-2 pl-3 text-sm [overflow-wrap:anywhere]">
           <p className="text-xs text-muted-foreground">{dateTime(entry.at)} · {entry.actor ?? 'unknown'}</p>
           {entry.action === 'create' && <p>Created</p>}
           {entry.action === 'delete' && <p>Deleted</p>}

@@ -1,17 +1,24 @@
 import type { Metadata } from 'next'
 import { adminApi } from '@/lib/api'
-import type { Spend } from '@/lib/types'
+import { requireOwner } from '@/lib/session'
+import type { Budget, Spend } from '@/lib/types'
 import { calendarDate, money, today } from '@/lib/format'
 import { Card, EmptyState, PageHeader } from '@/components/page'
 import { ErrorPanel } from '@/components/ErrorPanel'
 import { AddSpend, SpendRow } from '@/components/marketing/SpendForms'
+import { BudgetRow } from '@/components/marketing/BudgetRow'
 
 export const metadata: Metadata = { title: 'Marketing' }
 
 export default async function MarketingPage() {
+  await requireOwner()
   let data: { items: Spend[]; channels: string[] }
+  let budgets: Budget[]
   try {
-    data = await adminApi<{ items: Spend[]; channels: string[] }>('/marketing')
+    ;[data, budgets] = await Promise.all([
+      adminApi<{ items: Spend[]; channels: string[] }>('/marketing'),
+      adminApi<Budget[]>('/marketing/budgets', { query: { months: 6 } }),
+    ])
   } catch (e) {
     return <><PageHeader title="Marketing" /><ErrorPanel error={e} /></>
   }
@@ -33,6 +40,10 @@ export default async function MarketingPage() {
 
       <Card title="Add spend" className="mb-6">
         <AddSpend channels={data.channels} today={day} />
+      </Card>
+
+      <Card title="Monthly budget" description="What you plan to spend each month, ex GST, against what you have spent." className="mb-6" bodyClassName="py-1">
+        <ul>{budgets.map((b) => <BudgetRow key={b.month} budget={b} />)}</ul>
       </Card>
 
       {data.items.length === 0 ? (

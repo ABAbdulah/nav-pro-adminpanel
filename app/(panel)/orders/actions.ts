@@ -29,6 +29,8 @@ export async function updateOrder(orderNo: string, _prev: ActionState, form: For
       body.carrier = text(form, 'carrier') || null
       body.trackingNumber = text(form, 'trackingNumber') || null
       body.notifyCustomer = form.get('notifyCustomer') === 'on'
+      // Only sent when the form offered it, i.e. we hold stock of a line.
+      if (form.has('stockOffered')) body.takeFromStock = form.get('takeFromStock') === 'on'
     }
     if ((status === 'cancelled' || status === 'refunded') && form.get('confirm') !== 'on') {
       return { source: status, error: status === 'refunded' ? 'Tick the box to confirm the money has been refunded.' : 'Tick the box to confirm cancelling this order.' }
@@ -37,6 +39,12 @@ export async function updateOrder(orderNo: string, _prev: ActionState, form: For
     body.carrier = text(form, 'carrier') || null
     body.trackingNumber = text(form, 'trackingNumber') || null
     success = 'Tracking saved. The customer sees it on their order page.'
+  } else if (intent === 'deliveryCost') {
+    const raw = text(form, 'shippingCost').replace(/[$,s]/g, '')
+    const cost = raw === '' ? null : Number(raw)
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) return { source: 'deliveryCost', error: 'Enter what the carrier charged, like 12.40, or leave it empty.' }
+    body.shippingCostExGst = cost === null ? null : Math.round(cost * 100) / 100
+    success = cost === null ? 'Delivery cost cleared.' : 'Delivery cost saved. Profit figures include it now.'
   } else if (intent === 'notes') {
     body.adminNotes = text(form, 'adminNotes') || null
     success = 'Notes saved.'

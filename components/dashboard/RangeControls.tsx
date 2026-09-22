@@ -19,11 +19,20 @@ const off = 'bg-card hover:bg-secondary'
  * The period the dashboard covers. Plain links and a GET form, so the choice
  * lives in the URL: it survives a reload and can be bookmarked or shared.
  */
-export function RangeControls({ range, from, to, interval }: { range: RangeKey; from: string; to: string; interval: 'day' | 'month' }) {
+export function RangeControls({ range, from, to, interval, base = '/', extra = {}, showInterval = true }: {
+  range: RangeKey
+  from: string
+  to: string
+  interval: 'day' | 'month'
+  // The page these links go to, and query values to keep (e.g. the report's grouping).
+  base?: string
+  extra?: Record<string, string>
+  showInterval?: boolean
+}) {
   const keep = (changes: Record<string, string>) => {
-    const params = new URLSearchParams(range === 'custom' ? { range, from, to } : { range })
+    const params = new URLSearchParams({ ...extra, ...(range === 'custom' ? { range, from, to } : { range }) })
     for (const [k, v] of Object.entries(changes)) params.set(k, v)
-    return `/?${params.toString()}`
+    return `${base}?${params.toString()}`
   }
 
   return (
@@ -32,15 +41,16 @@ export function RangeControls({ range, from, to, interval }: { range: RangeKey; 
         <p className="mb-1.5 text-[13px] font-semibold">Period</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Period">
           {PRESETS.map((p) => (
-            <Link key={p.key} href={`/?range=${p.key}`} aria-current={range === p.key ? 'true' : undefined} className={cn(chip, range === p.key ? on : off)}>
+            <Link key={p.key} href={`${base}?${new URLSearchParams({ ...extra, range: p.key }).toString()}`} aria-current={range === p.key ? 'true' : undefined} className={cn(chip, range === p.key ? on : off)}>
               {p.label}
             </Link>
           ))}
         </div>
       </div>
 
-      <form action="/" className="flex flex-wrap items-end gap-2">
+      <form action={base} className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="range" value="custom" />
+        {Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <label className="grid gap-1 text-[13px] font-semibold">
           From
           <input type="date" name="from" defaultValue={from} required className="h-10 rounded-lg border border-input bg-card px-2 text-sm font-normal" />
@@ -52,13 +62,13 @@ export function RangeControls({ range, from, to, interval }: { range: RangeKey; 
         <button type="submit" className={cn(chip, range === 'custom' ? on : off)}>Show</button>
       </form>
 
-      <div>
+      {showInterval && <div>
         <p className="mb-1.5 text-[13px] font-semibold">Group by</p>
         <div className="flex gap-2" role="group" aria-label="Group by">
           <Link href={keep({ interval: 'day' })} aria-current={interval === 'day' ? 'true' : undefined} className={cn(chip, interval === 'day' ? on : off)}>Day</Link>
           <Link href={keep({ interval: 'month' })} aria-current={interval === 'month' ? 'true' : undefined} className={cn(chip, interval === 'month' ? on : off)}>Month</Link>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
