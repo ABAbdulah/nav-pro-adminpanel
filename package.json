@@ -2,7 +2,9 @@
   "name": "nav-pro-adminpanel",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=20.9" },
+  "engines": {
+    "node": ">=20.9"
+  },
   "scripts": {
     "dev": "next dev --webpack -p 3010",
     "build": "next build --webpack",
@@ -14,6 +16,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "lucide-react": "^1.42.0",
+    "marked": "^16.4.2",
     "next": "^16.3.4",
     "postcss": "^8.5.28",
     "radix-ui": "^1.6.7",

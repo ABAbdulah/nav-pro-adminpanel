@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { BarChart3, History, LogOut, Megaphone, Menu, Package, PieChart, Settings, ShoppingBag, Tags, Truck, Users, UsersRound, X } from 'lucide-react'
+import { BarChart3, History, LogOut, Megaphone, Menu, Newspaper, Package, PieChart, Settings, ShoppingBag, Tags, Truck, Users, UsersRound, X } from 'lucide-react'
 import { signOut } from '@/app/sign-in/actions'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +17,7 @@ const LINKS: { href: string; label: string; icon: typeof BarChart3; badge?: bool
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/reports', label: 'Reports', icon: PieChart },
   { href: '/marketing', label: 'Marketing', icon: Megaphone },
+  { href: '/blog', label: 'Blog', icon: Newspaper },
   { href: '/pricing', label: 'Pricing rules', icon: Tags, divider: true },
   { href: '/shipping', label: 'Delivery', icon: Truck },
   { href: '/team', label: 'Team', icon: UsersRound },

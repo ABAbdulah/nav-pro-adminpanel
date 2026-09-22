@@ -86,3 +86,16 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Blog editor preview: close to how the storefront shows an article. */
+.article-preview { font-size: 16px; line-height: 1.7; overflow-wrap: break-word; }
+.article-preview > * + * { margin-top: 14px; }
+.article-preview h2 { font-size: 24px; font-weight: 700; margin-top: 28px; }
+.article-preview h3 { font-size: 19px; font-weight: 700; margin-top: 22px; }
+.article-preview ul, .article-preview ol { padding-left: 22px; display: grid; gap: 6px; }
+.article-preview ul { list-style: disc; }
+.article-preview ol { list-style: decimal; }
+.article-preview a { color: var(--action-text); text-decoration: underline; }
+.article-preview strong { font-weight: 600; }
+.article-preview blockquote { border-left: 3px solid var(--brand); padding-left: 14px; color: var(--muted-foreground); }
+.article-preview img { max-width: 100%; border-radius: 8px; }
