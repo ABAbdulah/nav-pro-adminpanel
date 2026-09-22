@@ -79,6 +79,9 @@ without it), `STOREFRONT_URL` (optional).
 | `app/(panel)/orders/*` | List with tabs (to send, shipped, all paid, not paid, refunded, cancelled), search, `AutoRefresh` every 60 s; detail with timeline, lines with supplier/SKU/cost/profit, payments, history; `components/orders/OrderActions.tsx` (pack, ship + email, tracking, notes, cancel, refund) |
 | `app/(panel)/products/*` | List with filters, cost/RRP/price/margin; edit page with `components/products/ProductEditor.tsx` (title, description, own price with live margin, photo by link, show/hide, notes) |
 | `app/(panel)/marketing/*` | Add, edit, delete spend; totals by month and channel |
+| `app/(panel)/blog/*`, `components/blog/*` | Store guides (owners only): list, `NewPost`, `PostEditor` (markdown with Write/Preview, cover upload, Google snippet preview, web address, related-parts search words, publish/unpublish, delete). Needs store migration `0003-blog.sql` |
+| `lib/markdown.ts` | Client copy of the storefront's markdown rules for the preview (raw HTML as text, headings from h2, safe links only). Change both together |
+| `lib/shrink-image.ts` | `shrink()`: browser-side resize to JPEG before an upload (product photos and blog covers) |
 | `app/(panel)/shipping/*` | Delivery areas (zones) and options (rates) |
 | `app/(panel)/reports/*`, `app/export/[kind]/route.ts`, `lib/csv.ts` | Sales by category, brand, supplier or product; CSV downloads (orders, profit, breakdown), formula-safe |
 | `app/(panel)/customers/*` | Customers grouped by email, and each one's orders |
@@ -98,8 +101,8 @@ without it), `STOREFRONT_URL` (optional).
 - A form that disappears after its action (the order moves on) loses its message. Order status changes share one message area at the top of the card for that reason.
 - `loading.tsx` streams first, so a test that reads `main` right after `goto` sees the skeleton. Wait for `main h1`.
 - Staff get order data without cost fields from the API (`X-Admin-Role: staff`). Anything a client component receives is visible in the browser, so owner-only figures must never be fetched for a staff session rather than just hidden.
-- An upload saves the product. The editor tracks the product's version (`ifUnchangedSince`) and moves it on after an upload, or the next save looks like a conflicting edit.
-- Vercel limits a request to 4.5 MB, so photos are shrunk in the browser (`shrink()` in ProductEditor) before the server action sends them on.
+- An upload saves the product. The same goes for a blog cover: `PostEditor` moves its version on after the upload. The editor tracks the product's version (`ifUnchangedSince`) and moves it on after an upload, or the next save looks like a conflicting edit.
+- Vercel limits a request to 4.5 MB, so photos are shrunk in the browser (`shrink()` in `lib/shrink-image.ts`) before the server action sends them on.
 - In smoke runs the panel serves as production, so its cookie is `secure`: Playwright's own HTTP client will not send it over http. Fetch from inside the page instead.
 
 ## Design

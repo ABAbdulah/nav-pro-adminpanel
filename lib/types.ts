@@ -316,3 +316,25 @@ export type Settings = {
 
 /** A server action's result, shaped for useActionState. */
 export type ActionState = { ok?: boolean; error?: string; message?: string; fieldErrors?: Record<string, string[]>; source?: string }
+
+export type BlogPostAdmin = {
+  id: number
+  slug: string
+  title: string
+  excerpt: string | null
+  bodyMd: string
+  coverImageUrl: string | null
+  coverAlt: string | null
+  status: 'draft' | 'published'
+  publishedAt: string | null
+  authorName: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  relatedQuery: string | null
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+  words?: number
+  history?: HistoryEntry[]
+}
