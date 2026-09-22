@@ -15,18 +15,23 @@ export class ApiError extends Error {
   }
 }
 
+/*
+ * Setup mistakes are reported as ApiError so the page names the setting to fix.
+ * The messages name variables, never their values.
+ */
 function base(): string {
-  const url = process.env.ADMIN_API_URL
-  if (!url) throw new Error('ADMIN_API_URL is not set')
-  return url.replace(/\/$/, '')
+  const url = process.env.ADMIN_API_URL?.trim()
+  if (!url) throw new ApiError(0, 'The panel’s ADMIN_API_URL setting is empty. Set it to the store API address, e.g. https://nav-pro-listing-production.up.railway.app, and redeploy.')
+  if (!/^https?:\/\/[^/\s]+/i.test(url)) throw new ApiError(0, 'The panel’s ADMIN_API_URL setting is not a web address. It must start with https:// (e.g. https://nav-pro-listing-production.up.railway.app). Fix it and redeploy.')
+  return url.replace(/\/+$/, '').replace(/\/api$/, '')
 }
 
 type Options = { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown; query?: Record<string, string | number | undefined | null> }
 
 export async function adminApi<T>(path: string, { method = 'GET', body, query }: Options = {}): Promise<T> {
   const operator = await requireOperator()
-  const token = process.env.ADMIN_TOKEN
-  if (!token) throw new Error('ADMIN_TOKEN is not set')
+  const token = process.env.ADMIN_TOKEN?.trim()
+  if (!token) throw new ApiError(0, 'The panel’s ADMIN_TOKEN setting is empty. Copy ADMIN_TOKEN from the nav-pro-listing service on Railway into Vercel and redeploy.')
 
   const url = new URL(`${base()}/api/admin${path}`)
   for (const [key, value] of Object.entries(query ?? {})) {
@@ -59,6 +64,8 @@ export async function adminApi<T>(path: string, { method = 'GET', body, query }:
       (data?.error as string | undefined) ?? `The store API answered ${response.status}.`
     throw new ApiError(response.status, message, data?.details)
   }
+  // A 200 that is not JSON is some other website: the address is wrong.
+  if (data === null) throw new ApiError(0, 'ADMIN_API_URL does not point at the store API (the answer was not API data). Set it to https://nav-pro-listing-production.up.railway.app and redeploy.')
   return data as T
 }
 
