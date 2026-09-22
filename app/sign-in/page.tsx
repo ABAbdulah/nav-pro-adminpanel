@@ -12,7 +12,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <main id="main" className="grid min-h-dvh place-items-center bg-brand px-4 py-10">
       <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-lg sm:p-8">
-        <p className="text-sm font-medium text-muted-foreground">Parts Finder</p>
+        <p className="text-sm font-medium text-muted-foreground">euautostore</p>
         <h1 className="mb-6 text-3xl font-bold">Admin sign in</h1>
         <SignInForm next={next ?? ''} />
       </div>

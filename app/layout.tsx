@@ -6,7 +6,7 @@ const body = Barlow({ subsets: ['latin'], weight: ['400', '500', '600', '700'], 
 const display = Barlow_Condensed({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-display', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: { default: 'Parts Finder admin', template: '%s · Parts Finder admin' },
+  title: { default: 'euautostore admin', template: '%s · euautostore admin' },
   robots: { index: false, follow: false },
 }
 
